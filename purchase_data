@@ -1,0 +1,27 @@
+# A purpose of pulling purchase data is to see how many units have been purchased from manufacturers.
+
+SELECT
+
+BA.AcctCD
+,BA.AcctName 
+,CAST(POL.OrderDate as datetime) OrderDate   # need to convert to datetime since it was pulled as a string
+,RTRIM(INV.InventoryCD) InventoryCD          # need to get rid of spaces after characters end 
+,INV.Descr
+,POL.TranDesc
+,POL.ReceivedQty
+,POL.UnitCost
+,POL.CuryExtCost
+,POO.CuryID
+,GLBLREF.AlternateID MnfgrCode 
+
+# Why used Select statement for each table? 
+# Need to filter out companyID, BranchID, and other filters to make it sure correct data gets pulled. 
+
+FROM (SELECT* FROM POLine WHERE CompanyID=11 AND (BranchID IS NULL OR BranchID IN (23, 47, 48, 46, 32, 30, 55, 29))) POL 
+INNER JOIN (SELECT* FROM Vendor WHERE CompanyID=11 AND DeletedDatabaseRecord = 0) VEN ON POL.VendorID = VEN.BAccountID 
+INNER JOIN (SELECT* FROM BAccount WHERE CompanyID=11 AND DeletedDatabaseRecord = 0) BA ON VEN.BAccountID= BA.BAccountID
+INNER JOIN (SELECT* FROM POOrder WHERE CompanyID=11 AND (BranchID IS NULL OR BranchID IN (23, 47, 48, 46, 32, 30, 55, 29))) POO ON POL.OrderNbr = POO.OrderNbr AND POL.OrderType = POO.OrderType
+INNER JOIN (SELECT* FROM InventoryItem WHERE CompanyID=11 AND DeletedDatabaseRecord = 0)  INV ON POL.InventoryID = INV.InventoryID AND 1= INV.StkItem 
+LEFT JOIN (SELECT* FROM INItemXRef WHERE CompanyID = 11 AND AlternateType='GLBL' )GLBLREF ON INV.InventoryID = GLBLREF.InventoryID 
+
+WHERE POL.LineType ='GI' AND POL.OrderDate < '2023-03-01' AND BA.AcctCD IN ('COLT100', 'PREM500', 'PULP500', 'KURA500')  

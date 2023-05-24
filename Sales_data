@@ -1,0 +1,60 @@
+# Sales data required to calculate how many units have been sold to customers after purchases from manufacturers. 
+
+SELECT
+
+BA.AcctCD
+,BA.AcctName
+,CLASS.Descr
+,SOL.OrderType
+,AR.TranType
+,AR.RefNbr
+,CAST(AR.TranDate as datetime) TranDate
+,ARAD.AddressLine1
+,ARAD.AddressLine2
+,ARAD.City
+,ARAD.State
+,ARAD.PostalCode
+,ARAD.CountryID
+,ARC.FullName
+,ARC.Attention
+,ARC.Phone1
+,ARC.Email
+,RTRIM(INV.InventoryCD) InventoryCD
+,FOC100.AlternateID
+,INV.UsrGlobal GlobalID
+,INV.Descr Inventory_Descr
+,(CASE WHEN AR.DrCr ='D' THEN (-1.0)*AR.Qty ELSE 1.0*AR.Qty END) SALES_QTY
+,(CASE WHEN AR.DrCr ='D' THEN (-1.0)*AR.CuryTranAmt ELSE 1.0*AR.CuryTranAmt END) SALES_AMT
+,(CASE WHEN ( AR.DrCr = 'D') THEN  (- 1.0) ELSE 1.0 END * CASE WHEN ( AR.IsTranCostFinal = CONVERT (BIT, 0)) THEN AR.TranCostOrig ELSE AR.TranCost END) UnitCost
+,CASE 
+	WHEN CSDO.ValueID IS NULL THEN ''
+	ELSE CSDO.ValueID
+END AS Selling_Channel
+,CASE 
+	WHEN AR.Qty/SOL.UsrAlternateUOM IS NULL THEN 0
+	ELSE AR.Qty/SOL.UsrAlternateUOM
+END AS Alternate_qty
+,CASE
+	WHEN (AR.Qty/SOL.UsrAlternateUOM)*SOL.UsrAlternateUnitPrice IS NULL THEN 0
+	ELSE (AR.Qty/SOL.UsrAlternateUOM)*SOL.UsrAlternateUnitPrice
+END AS Alternate_Price
+,(CASE WHEN ( AR.DrCr = 'D') THEN  (- 1.0) ELSE 1.0 END * CASE WHEN ( AR.IsTranCostFinal = CONVERT (BIT, 0)) THEN AR.TranCostOrig ELSE AR.TranCost END) *1.1 Cost_Plus_10
+,CSD.ValueID Mnfgr_Name
+,CSD.Description Mnfgr_longname
+
+FROM ARInvoice ARI
+INNER JOIN (SELECT* FROM ARRegister WHERE DeletedDatabaseRecord = 0 and CompanyID=11 AND ( BranchID IS NULL OR BranchID IN (23, 47, 48, 46, 32, 30, 55, 29))) ARR ON ARI.DocType = ARR.DocType AND ARI.RefNbr = ARR.RefNbr
+INNER JOIN (SELECT* FROM Customer WHERE DeletedDatabaseRecord=0 AND CompanyID=11) CUS ON ARR.CustomerID = CUS.BAccountID
+INNER JOIN (SELECT* FROM CustomerClass WHERE CompanyID=11) CLASS ON CUS.CustomerClassID = CLASS.CustomerClassID
+INNER JOIN (SELECT* FROM BAccount WHERE DeletedDatabaseRecord = 0 AND CompanyID=11) BA ON CUS.BAccountID = BA.BAccountID
+INNER JOIN (SELECT* FROM ARTran WHERE CompanyID = 11 AND( BranchID IS NULL OR BranchID IN (23, 47, 48, 46, 32, 30, 55, 29))) AR ON ARI.DocType = AR.TranType AND ARI.RefNbr = AR.RefNbr
+INNER JOIN (SELECT* FROM InventoryItem WHERE CompanyID = 11 AND DeletedDatabaseRecord=0) INV ON AR.InventoryID = INV.InventoryID
+LEFT JOIN (SELECT* FROM INItemXRef WHERE CompanyID =11 AND BAccountID = '126937' AND AlternateType = '0CPN') FOC100 on INV.InventoryID = FOC100.InventoryID  
+INNER JOIN (SELECT* FROM ARAddress WHERE CompanyID=11) ARAD ON ARI.ShipAddressID = ARAD.AddressID
+INNER JOIN (SELECT* FROM ARContact WHERE CompanyID=11) ARC ON ARI.ShipContactID = ARC.ContactID
+INNER JOIN (SELECT* FROM SOLine WHERE CompanyID=11) SOL ON AR.SOOrderType = SOL.OrderType AND AR.SOOrderNbr = SOL.OrderNbr AND AR.SOOrderLineNbr = SOL.LineNbr
+LEFT JOIN (SELECT* FROM dbo.CSAnswers WHERE CompanyID = 11) CS ON INV.NoteID = CS.RefNoteID AND 'ITEMBRAND' = CS.AttributeID 
+LEFT JOIN (SELECT* FROM dbo.CSAttributeDetail WHERE CompanyID = 11 and AttributeID='ITEMBRAND') CSD ON CS.AttributeID = CSD.AttributeID AND CS.Value =CSD.ValueID 
+LEFT JOIN (SELECT* FROM dbo.CSAnswers WHERE CompanyID = 11) CSO ON BA.NoteID = CSO.RefNoteID AND 'SELLCHANEL' = CSO.AttributeID 
+LEFT JOIN (SELECT* FROM dbo.CSAttributeDetail WHERE CompanyID = 11 and AttributeID='SELLCHANEL') CSDO ON CSO.AttributeID = CSDO.AttributeID AND CSO.Value =CSDO.ValueID 
+WHERE AR.TranDate BETWEEN '2023-02-01' AND '2023-02-28' AND  ARR.Released=1 AND INV.ItemClassID = 407 AND AR.TranType = 'INV' AND ARI.CompanyID = 11 AND ARAD.CountryID = 'CA' AND CLASS.Descr = 'Canadian Customers'

@@ -1,4 +1,4 @@
-# ZipReporting
+# Zip Reporting
 
 **A Purpose of the Project**
 This project was initiated because a previous process involved manual data pulls using OData with Excel and utilized Excel functions (SUMIFS and XLOOKUP) to calculate the amount of sales that needed to be reported to manufacturers.
